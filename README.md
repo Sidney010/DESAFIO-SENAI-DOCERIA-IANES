@@ -40,11 +40,7 @@ Para cumprir os rígidos Requisitos Não-Funcionais (RNF) de desempenho e usabil
 
 ## 📐 Estrutura de Ramificações (Branches) do Git
 
-O projeto adota o padrão de **Feature Branches** para garantir o isolamento do código e simular um ambiente profissional de engenharia de software:
-
 * `main`: Linha do tempo principal estável. Contém apenas código testado e pronto para produção.
-* `backend/desenvolvimento-api`: Construção do servidor, endpoints e segurança da API (`/BACK`).
-* `frontend/desenvolvimento-telas`: Implementação da interface do usuário, modais e lógica de estado (`/FRONT`).
 
 ---
 
