@@ -1,0 +1,1179 @@
+openapi: 3.0.0
+info:
+  title: API Doceria Gourmet IANES
+  description: >
+    API RESTful para gerenciamento de estoque da Doceria Gourmet IANES.
+    Controla produtos, lotes, movimentações e notificações de validade e estoque baixo.
+  version: 1.0.0
+  contact:
+    name: Sidney Campos Aragão
+
+servers:
+  - url: http://localhost:8080/v1/IANES
+    description: Ambiente de desenvolvimento
+
+tags:
+  - name: Usuário
+    description: Cadastro, login e recuperação de senha
+  - name: Categoria
+    description: Gerenciamento de categorias de produtos
+  - name: Produto
+    description: Gerenciamento de produtos do catálogo
+  - name: Lote
+    description: Controle de lotes e validade de estoque
+  - name: Movimentação
+    description: Entradas e saídas de estoque
+  - name: Notificação
+    description: Alertas de validade e estoque baixo
+
+# ════════════════════════════════════════════════════════════════════════════
+# COMPONENTES REUTILIZÁVEIS
+# ════════════════════════════════════════════════════════════════════════════
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    # ── Respostas padrão ──────────────────────────────────────────────────────
+    ErroValidacao:
+      type: object
+      properties:
+        status:       { type: string,  example: "Bad Request" }
+        status_code:  { type: integer, example: 400 }
+        message:      { type: string,  example: "Campos obrigatórios não preenchidos corretamente." }
+
+    ErroNaoEncontrado:
+      type: object
+      properties:
+        status:       { type: string,  example: "Not Found" }
+        status_code:  { type: integer, example: 404 }
+        message:      { type: string,  example: "Nenhum item encontrado." }
+
+    ErroNaoAutorizado:
+      type: object
+      properties:
+        status:       { type: string,  example: "Unauthorized" }
+        status_code:  { type: integer, example: 401 }
+        message:      { type: string,  example: "Token inválido ou expirado." }
+
+    ErroInterno:
+      type: object
+      properties:
+        status:       { type: string,  example: "Internal Server Error" }
+        status_code:  { type: integer, example: 500 }
+        message:      { type: string,  example: "Erro interno no servidor." }
+
+    # ── Modelos de dados ──────────────────────────────────────────────────────
+    Usuario:
+      type: object
+      properties:
+        id_usuario:  { type: integer, example: 1 }
+        nome:        { type: string,  example: "Sidney Aragão" }
+        email:       { type: string,  example: "sidney@ianes.com" }
+        is_active:   { type: boolean, example: true }
+
+    Categoria:
+      type: object
+      properties:
+        id_categoria:   { type: integer, example: 1 }
+        nome_categoria: { type: string,  example: "Bolo" }
+
+    Produto:
+      type: object
+      properties:
+        id_produto:            { type: integer, example: 1 }
+        nome_produto:          { type: string,  example: "Bolo de Chocolate" }
+        codigo_identificador:  { type: integer, example: 1001 }
+        sabor_massa:           { type: string,  example: "Chocolate", nullable: true }
+        recheio:               { type: string,  example: "Brigadeiro", nullable: true }
+        cobertura:             { type: string,  example: "Ganache", nullable: true }
+        detalhes:              { type: string,  example: "Sem glúten", nullable: true }
+        limite_minimo_alerta:  { type: integer, example: 3 }
+        id_categoria:          { type: integer, example: 1 }
+        nome_categoria:        { type: string,  example: "Bolo" }
+
+    Lote:
+      type: object
+      properties:
+        id_lote:            { type: integer, example: 1 }
+        data_fabricacao:    { type: string,  format: date-time, example: "2026-05-27T08:00:00" }
+        data_vencimento:    { type: string,  format: date,      example: "2026-06-03" }
+        tipo_medida:        { type: string,  enum: [peso, porcao], example: "porcao" }
+        quantidade_peso:    { type: number,  example: null, nullable: true }
+        quantidade_porcoes: { type: integer, example: 12 }
+        status_validade:    { type: string,  enum: [No prazo, Alerta, Vencido], example: "No prazo" }
+        id_produto:         { type: integer, example: 1 }
+        nome_produto:       { type: string,  example: "Bolo de Chocolate" }
+        nome_categoria:     { type: string,  example: "Bolo" }
+
+    Movimentacao:
+      type: object
+      properties:
+        id_movimentacao:    { type: integer, example: 1 }
+        tipo_movimentacao:  { type: string,  enum: [Entrada, Saída], example: "Entrada" }
+        motivo:             { type: string,  example: "Nova fornada produzida" }
+        quantidade:         { type: number,  example: 12 }
+        data_hora:          { type: string,  format: date-time, example: "2026-05-27T10:30:00" }
+        id_lote:            { type: integer, example: 1 }
+        data_vencimento:    { type: string,  format: date, example: "2026-06-03" }
+        status_validade:    { type: string,  example: "No prazo" }
+        id_produto:         { type: integer, example: 1 }
+        nome_produto:       { type: string,  example: "Bolo de Chocolate" }
+        id_usuario:         { type: integer, example: 1 }
+        nome_usuario:       { type: string,  example: "Sidney Aragão" }
+
+    DashboardItem:
+      type: object
+      properties:
+        id_produto:            { type: integer, example: 1 }
+        nome_produto:          { type: string,  example: "Bolo de Chocolate" }
+        codigo_identificador:  { type: integer, example: 1001 }
+        nome_categoria:        { type: string,  example: "Bolo" }
+        limite_minimo_alerta:  { type: integer, example: 3 }
+        quantidade_total:      { type: number,  example: 8 }
+        status_critico:        { type: string,  enum: [No prazo, Alerta, Vencido], example: "No prazo" }
+        estoque_baixo:         { type: boolean, example: false }
+        total_lotes:           { type: integer, example: 2 }
+
+    NotificacaoItem:
+      type: object
+      properties:
+        tipo_notificacao:      { type: string,  enum: [validade, estoque_baixo], example: "validade" }
+        prioridade:            { type: string,  enum: [ALTA, MEDIA, BAIXA], example: "ALTA" }
+        status_validade:       { type: string,  example: "Vencido" }
+        id_produto:            { type: integer, example: 1 }
+        nome_produto:          { type: string,  example: "Bolo de Chocolate" }
+        codigo_identificador:  { type: integer, example: 1001 }
+        nome_categoria:        { type: string,  example: "Bolo" }
+        id_lote:               { type: integer, example: 1, nullable: true }
+        data_vencimento:       { type: string,  format: date, example: "2026-05-25", nullable: true }
+        dias_para_vencer:      { type: integer, example: -2, nullable: true }
+        quantidade_atual:      { type: number,  example: 4 }
+        tipo_medida:           { type: string,  example: "porcao", nullable: true }
+        limite_minimo_alerta:  { type: integer, example: 3, nullable: true }
+
+# ════════════════════════════════════════════════════════════════════════════
+# ROTAS
+# ════════════════════════════════════════════════════════════════════════════
+paths:
+
+  # ══════════════════════════════════════════════
+  # USUÁRIO
+  # ══════════════════════════════════════════════
+
+  /usuario:
+    get:
+      tags: [Usuário]
+      summary: Listar todos os usuários
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de usuários retornada com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  usuarios:
+                    - id_usuario: 1
+                      nome: "Sidney Aragão"
+                      email: "sidney@ianes.com"
+                      is_active: true
+                    - id_usuario: 2
+                      nome: "Maria Doces"
+                      email: "maria@ianes.com"
+                      is_active: true
+        '401': { description: Token ausente ou inválido, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoAutorizado' } } } }
+        '404': { description: Nenhum usuário encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+    post:
+      tags: [Usuário]
+      summary: Cadastrar novo usuário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              nome: "Sidney Aragão"
+              email: "sidney@ianes.com"
+              senha: "Senai@2026"
+      responses:
+        '201':
+          description: Usuário cadastrado com sucesso
+          content:
+            application/json:
+              example:
+                status: "Created"
+                status_code: 201
+                message: "Item criado com sucesso!"
+                response:
+                  usuario:
+                    id_usuario: 1
+                    nome: "Sidney Aragão"
+                    email: "sidney@ianes.com"
+        '400': { description: Dados inválidos ou email já cadastrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroValidacao' } } } }
+
+  /usuario/{id}:
+    get:
+      tags: [Usuário]
+      summary: Buscar usuário por ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Usuário encontrado
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  usuario:
+                    id_usuario: 1
+                    nome: "Sidney Aragão"
+                    email: "sidney@ianes.com"
+                    is_active: true
+        '404': { description: Usuário não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+    put:
+      tags: [Usuário]
+      summary: Atualizar dados do usuário (parcial)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              nome: "Sidney Campos"
+      responses:
+        '200':
+          description: Usuário atualizado com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item atualizado com sucesso!"
+                response:
+                  usuario:
+                    id_usuario: 1
+                    nome: "Sidney Campos"
+        '400': { description: Dados inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/ErroValidacao' } } } }
+        '404': { description: Usuário não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+    delete:
+      tags: [Usuário]
+      summary: Desativar usuário (soft delete)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Usuário desativado com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item deletado com sucesso!"
+        '404': { description: Usuário não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+  /usuario/login:
+    post:
+      tags: [Usuário]
+      summary: Realizar login e obter Bearer Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              email: "sidney@ianes.com"
+              senha: "Senai@2026"
+      responses:
+        '200':
+          description: Login realizado com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  usuario:
+                    id_usuario: 1
+                    nome: "Sidney Aragão"
+                    email: "sidney@ianes.com"
+                  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '401':
+          description: Credenciais inválidas
+          content:
+            application/json:
+              example:
+                status: "Unauthorized"
+                status_code: 401
+                message: "Email ou senha incorretos."
+
+  /usuario/recuperar-senha:
+    post:
+      tags: [Usuário]
+      summary: Solicitar código de recuperação de senha por e-mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              email: "sidney@ianes.com"
+      responses:
+        '200':
+          description: Solicitação processada (resposta genérica intencional)
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Se o e-mail estiver cadastrado, você receberá o código em breve."
+
+  /usuario/redefinir-senha:
+    post:
+      tags: [Usuário]
+      summary: Redefinir senha com código de 6 dígitos recebido por e-mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              email: "sidney@ianes.com"
+              codigo: "483921"
+              nova_senha: "NovaSenha@2026"
+      responses:
+        '200':
+          description: Senha redefinida com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Senha redefinida com sucesso!"
+        '400':
+          description: Código inválido ou expirado
+          content:
+            application/json:
+              example:
+                status: "Bad Request"
+                status_code: 400
+                message: "Campos obrigatórios não preenchidos corretamente. [codigo inválido ou expirado]"
+
+  # ══════════════════════════════════════════════
+  # CATEGORIA
+  # ══════════════════════════════════════════════
+
+  /categoria:
+    get:
+      tags: [Categoria]
+      summary: Listar todas as categorias
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Categorias retornadas com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  categorias:
+                    - id_categoria: 1
+                      nome_categoria: "Bolo"
+                    - id_categoria: 2
+                      nome_categoria: "Torta"
+                    - id_categoria: 3
+                      nome_categoria: "Doce Porção"
+
+    post:
+      tags: [Categoria]
+      summary: Cadastrar nova categoria
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              nome_categoria: "Bolo"
+      responses:
+        '201':
+          description: Categoria criada com sucesso
+          content:
+            application/json:
+              example:
+                status: "Created"
+                status_code: 201
+                message: "Item criado com sucesso!"
+                response:
+                  categoria:
+                    id_categoria: 1
+                    nome_categoria: "Bolo"
+        '400': { description: Nome inválido ou já cadastrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroValidacao' } } } }
+
+  /categoria/{id}:
+    get:
+      tags: [Categoria]
+      summary: Buscar categoria por ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Categoria encontrada
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  categoria:
+                    id_categoria: 1
+                    nome_categoria: "Bolo"
+        '404': { description: Categoria não encontrada, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+    put:
+      tags: [Categoria]
+      summary: Atualizar categoria
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              nome_categoria: "Bolo Especial"
+      responses:
+        '200':
+          description: Categoria atualizada com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item atualizado com sucesso!"
+                response:
+                  categoria:
+                    id_categoria: 1
+                    nome_categoria: "Bolo Especial"
+        '400': { description: Dados inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/ErroValidacao' } } } }
+
+    delete:
+      tags: [Categoria]
+      summary: Excluir categoria
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Categoria excluída com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item deletado com sucesso!"
+        '404': { description: Categoria não encontrada, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+  # ══════════════════════════════════════════════
+  # PRODUTO
+  # ══════════════════════════════════════════════
+
+  /produto:
+    get:
+      tags: [Produto]
+      summary: Listar todos os produtos
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Produtos retornados com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  produtos:
+                    - id_produto: 1
+                      nome_produto: "Bolo de Chocolate"
+                      codigo_identificador: 1001
+                      sabor_massa: "Chocolate"
+                      recheio: "Brigadeiro"
+                      cobertura: "Ganache"
+                      detalhes: "Sem glúten"
+                      limite_minimo_alerta: 3
+                      id_categoria: 1
+                      nome_categoria: "Bolo"
+
+    post:
+      tags: [Produto]
+      summary: Cadastrar novo produto
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              nome_produto: "Bolo de Chocolate"
+              id_categoria: 1
+              sabor_massa: "Chocolate"
+              recheio: "Brigadeiro"
+              cobertura: "Ganache"
+              detalhes: "Sem glúten"
+              limite_minimo_alerta: 3
+      responses:
+        '201':
+          description: Produto criado com sucesso
+          content:
+            application/json:
+              example:
+                status: "Created"
+                status_code: 201
+                message: "Item criado com sucesso!"
+                response:
+                  produto:
+                    id_produto: 1
+                    nome_produto: "Bolo de Chocolate"
+                    codigo_identificador: 1001
+                    id_categoria: 1
+        '400': { description: Dados inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/ErroValidacao' } } } }
+        '404': { description: Categoria não encontrada, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+  /produto/filtro:
+    get:
+      tags: [Produto]
+      summary: Buscar produtos com filtros dinâmicos
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: nome
+          schema: { type: string, example: "bolo" }
+        - in: query
+          name: codigo
+          schema: { type: integer, example: 1001 }
+        - in: query
+          name: categoria
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Produtos encontrados
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  produtos:
+                    - id_produto: 1
+                      nome_produto: "Bolo de Chocolate"
+                      codigo_identificador: 1001
+                      nome_categoria: "Bolo"
+        '400': { description: Nenhum filtro informado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroValidacao' } } } }
+
+  /produto/proximo-codigo:
+    get:
+      tags: [Produto]
+      summary: Retorna o próximo código identificador disponível
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Próximo código retornado
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  proximo_codigo: 1002
+
+  /produto/{id}:
+    get:
+      tags: [Produto]
+      summary: Buscar produto por ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Produto encontrado
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  produto:
+                    id_produto: 1
+                    nome_produto: "Bolo de Chocolate"
+                    codigo_identificador: 1001
+                    nome_categoria: "Bolo"
+        '404': { description: Produto não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+    put:
+      tags: [Produto]
+      summary: Atualizar produto (parcial)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              recheio: "Doce de Leite"
+              limite_minimo_alerta: 5
+      responses:
+        '200':
+          description: Produto atualizado com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item atualizado com sucesso!"
+                response:
+                  produto:
+                    id_produto: 1
+                    recheio: "Doce de Leite"
+                    limite_minimo_alerta: 5
+
+    delete:
+      tags: [Produto]
+      summary: Excluir produto (cascata nos lotes)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Produto excluído com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item deletado com sucesso!"
+        '404': { description: Produto não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+  # ══════════════════════════════════════════════
+  # LOTE
+  # ══════════════════════════════════════════════
+
+  /lote/dashboard:
+    get:
+      tags: [Lote]
+      summary: Dashboard consolidado do estoque em tempo real
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Dashboard retornado com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  dashboard:
+                    - id_produto: 1
+                      nome_produto: "Bolo de Chocolate"
+                      codigo_identificador: 1001
+                      nome_categoria: "Bolo"
+                      limite_minimo_alerta: 3
+                      quantidade_total: 8
+                      status_critico: "No prazo"
+                      estoque_baixo: false
+                      total_lotes: 2
+                    - id_produto: 2
+                      nome_produto: "Torta de Morango"
+                      codigo_identificador: 1002
+                      nome_categoria: "Torta"
+                      limite_minimo_alerta: 2
+                      quantidade_total: 1
+                      status_critico: "Alerta"
+                      estoque_baixo: true
+                      total_lotes: 1
+
+  /lote/alertas:
+    get:
+      tags: [Lote]
+      summary: Produtos com estoque abaixo do mínimo
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Alertas de estoque baixo retornados
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  alertas:
+                    - id_produto: 2
+                      nome_produto: "Torta de Morango"
+                      limite_minimo_alerta: 2
+                      quantidade_atual: 1
+                  total_alertas: 1
+
+  /lote/status:
+    get:
+      tags: [Lote]
+      summary: Filtrar lotes por status de validade
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: valor
+          schema:
+            type: string
+            enum: [No prazo, Alerta, Vencido]
+            example: "Vencido"
+      responses:
+        '200':
+          description: Lotes filtrados retornados
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  lotes:
+                    - id_lote: 3
+                      data_vencimento: "2026-05-25"
+                      status_validade: "Vencido"
+                      nome_produto: "Torta de Morango"
+                      nome_categoria: "Torta"
+
+  /lote:
+    get:
+      tags: [Lote]
+      summary: Listar todos os lotes
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lotes retornados com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  lotes:
+                    - id_lote: 1
+                      data_fabricacao: "2026-05-27T08:00:00"
+                      data_vencimento: "2026-06-03"
+                      tipo_medida: "porcao"
+                      quantidade_porcoes: 12
+                      quantidade_peso: null
+                      status_validade: "No prazo"
+                      nome_produto: "Bolo de Chocolate"
+                      nome_categoria: "Bolo"
+
+    post:
+      tags: [Lote]
+      summary: Cadastrar novo lote
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              id_produto: 1
+              data_fabricacao: "2026-05-27T08:00:00"
+              data_vencimento: "2026-06-03"
+              tipo_medida: "porcao"
+              quantidade: 12
+      responses:
+        '201':
+          description: Lote criado com sucesso
+          content:
+            application/json:
+              example:
+                status: "Created"
+                status_code: 201
+                message: "Item criado com sucesso!"
+                response:
+                  lote:
+                    id_lote: 1
+                    data_vencimento: "2026-06-03"
+                    status_validade: "No prazo"
+                    quantidade_porcoes: 12
+        '400': { description: Dados inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/ErroValidacao' } } } }
+        '404': { description: Produto não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/ErroNaoEncontrado' } } } }
+
+  /lote/{id}:
+    get:
+      tags: [Lote]
+      summary: Buscar lote por ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Lote encontrado
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  lote:
+                    id_lote: 1
+                    status_validade: "No prazo"
+                    nome_produto: "Bolo de Chocolate"
+
+    put:
+      tags: [Lote]
+      summary: Atualizar lote (recalcula status automaticamente)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              data_vencimento: "2026-06-10"
+      responses:
+        '200':
+          description: Lote atualizado com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item atualizado com sucesso!"
+                response:
+                  lote:
+                    id_lote: 1
+                    data_vencimento: "2026-06-10"
+                    status_validade: "No prazo"
+
+    delete:
+      tags: [Lote]
+      summary: Excluir lote (falha se houver movimentações vinculadas)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Lote excluído com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Item deletado com sucesso!"
+        '500':
+          description: Lote possui movimentações vinculadas
+          content:
+            application/json:
+              example:
+                status: "Internal Server Error"
+                status_code: 500
+                message: "Não é possível excluir um lote com movimentações registradas!"
+
+  # ══════════════════════════════════════════════
+  # MOVIMENTAÇÃO
+  # ══════════════════════════════════════════════
+
+  /movimentacao:
+    get:
+      tags: [Movimentação]
+      summary: Listar histórico completo de movimentações
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Movimentações retornadas com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  movimentacoes:
+                    - id_movimentacao: 1
+                      tipo_movimentacao: "Entrada"
+                      motivo: "Nova fornada produzida"
+                      quantidade: 12
+                      data_hora: "2026-05-27T10:30:00"
+                      nome_produto: "Bolo de Chocolate"
+                      nome_usuario: "Sidney Aragão"
+
+    post:
+      tags: [Movimentação]
+      summary: Registrar movimentação de entrada ou saída
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              tipo_movimentacao: "Saída"
+              motivo: "Venda balcão"
+              quantidade: 3
+              id_lote: 1
+      responses:
+        '201':
+          description: Movimentação registrada com sucesso
+          content:
+            application/json:
+              example:
+                status: "Created"
+                status_code: 201
+                message: "Item criado com sucesso!"
+                response:
+                  movimentacao:
+                    id_movimentacao: 2
+                    tipo_movimentacao: "Saída"
+                    motivo: "Venda balcão"
+                    quantidade: 3
+                    data_hora: "2026-05-27T14:00:00"
+                    nome_produto: "Bolo de Chocolate"
+                    nome_usuario: "Sidney Aragão"
+        '400':
+          description: Saldo insuficiente ou lote vencido
+          content:
+            application/json:
+              example:
+                status: "Bad Request"
+                status_code: 400
+                message: "Quantidade de saída maior que o estoque disponível no lote."
+
+  /movimentacao/{id}:
+    get:
+      tags: [Movimentação]
+      summary: Buscar movimentação por ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Movimentação encontrada
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  movimentacao:
+                    id_movimentacao: 1
+                    tipo_movimentacao: "Entrada"
+                    quantidade: 12
+                    nome_produto: "Bolo de Chocolate"
+
+  /movimentacao/lote/{id_lote}:
+    get:
+      tags: [Movimentação]
+      summary: Listar movimentações de um lote específico
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id_lote
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Histórico do lote retornado
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  movimentacoes:
+                    - id_movimentacao: 1
+                      tipo_movimentacao: "Entrada"
+                      motivo: "Nova fornada"
+                      quantidade: 12
+                      data_hora: "2026-05-27T10:30:00"
+                      nome_usuario: "Sidney Aragão"
+                    - id_movimentacao: 2
+                      tipo_movimentacao: "Saída"
+                      motivo: "Venda balcão"
+                      quantidade: 3
+                      data_hora: "2026-05-27T14:00:00"
+                      nome_usuario: "Sidney Aragão"
+
+  # ══════════════════════════════════════════════
+  # NOTIFICAÇÃO
+  # ══════════════════════════════════════════════
+
+  /notificacao:
+    get:
+      tags: [Notificação]
+      summary: Painel completo de alertas consolidados e priorizados
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Notificações retornadas com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  notificacoes:
+                    total_alertas: 3
+                    resumo:
+                      vencidos: 1
+                      alertas: 1
+                      estoque_baixo: 1
+                    itens:
+                      - tipo_notificacao: "validade"
+                        prioridade: "ALTA"
+                        status_validade: "Vencido"
+                        nome_produto: "Torta de Morango"
+                        dias_para_vencer: -2
+                        quantidade_atual: 4
+                      - tipo_notificacao: "validade"
+                        prioridade: "MEDIA"
+                        status_validade: "Alerta"
+                        nome_produto: "Bolo de Limão"
+                        dias_para_vencer: 1
+                        quantidade_atual: 6
+                      - tipo_notificacao: "estoque_baixo"
+                        prioridade: "BAIXA"
+                        status_validade: "Estoque Baixo"
+                        nome_produto: "Doce de Leite Porção"
+                        quantidade_atual: 2
+                        limite_minimo_alerta: 5
+
+  /notificacao/contagem:
+    get:
+      tags: [Notificação]
+      summary: Contagem de alertas por prioridade (badge do sino)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Contagem retornada com sucesso
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  contagem:
+                    alta: 1
+                    media: 2
+                    baixa: 1
+                    total: 4
+
+  /notificacao/validade:
+    get:
+      tags: [Notificação]
+      summary: Alertas de validade separados por Vencidos e Em alerta
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Alertas de validade retornados
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  validade:
+                    total: 2
+                    vencidos:
+                      - id_lote: 3
+                        nome_produto: "Torta de Morango"
+                        data_vencimento: "2026-05-25"
+                        dias_para_vencer: -2
+                    alertas:
+                      - id_lote: 5
+                        nome_produto: "Bolo de Limão"
+                        data_vencimento: "2026-05-28"
+                        dias_para_vencer: 1
+
+  /notificacao/estoque-baixo:
+    get:
+      tags: [Notificação]
+      summary: Produtos com estoque abaixo do limite mínimo
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Alertas de estoque baixo retornados
+          content:
+            application/json:
+              example:
+                status: "OK"
+                status_code: 200
+                message: "Requisição realizada com sucesso!"
+                response:
+                  estoque_baixo:
+                    total: 1
+                    itens:
+                      - id_produto: 4
+                        nome_produto: "Doce de Leite Porção"
+                        nome_categoria: "Doce Porção"
+                        limite_minimo_alerta: 5
+                        quantidade_atual: 2
