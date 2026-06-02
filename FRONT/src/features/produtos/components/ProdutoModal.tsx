@@ -86,7 +86,7 @@ export function ProdutoModal({ produto, categorias, onFechar }: Props) {
           {/* Categoria */}
           <div>
             <label className={labelClass}>Categoria *</label>
-            <select {...register('id_categoria')} className={inputClass + ' bg-white'}>
+            <select {...register('id_categoria', { valueAsNumber: true })} className={inputClass + ' bg-white'}>
               <option value={0}>Selecione uma categoria</option>
               {categorias.map(cat => (
                 <option key={cat.id_categoria} value={cat.id_categoria}>
@@ -126,7 +126,7 @@ export function ProdutoModal({ produto, categorias, onFechar }: Props) {
               type="number"
               min={0}
               placeholder="Ex: 3"
-              {...register('limite_minimo_alerta')}
+              {...register('limite_minimo_alerta', { valueAsNumber: true })}
               className={inputClass}
             />
             {errors.limite_minimo_alerta && <p className={errorClass}>{errors.limite_minimo_alerta.message}</p>}

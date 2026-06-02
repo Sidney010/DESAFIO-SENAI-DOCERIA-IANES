@@ -9,6 +9,9 @@ import { RecuperarSenhaPage }  from '../features/auth/pages/RecuperarSenhaPage'
 import { RedefinirSenhaPage }  from '../features/auth/pages/RedefinirSenhaPage'
 import { DashboardPage }       from '../features/dashboard/pages/DashboardPage'
 import { ProdutosPage }        from '../features/produtos/pages/ProdutosPage'
+import { EstoquePage } from '../features/estoque/pages/EstoquePage'
+import { NotificacoesPage } from '../features/notificacoes/pages/NotificacoesPage'
+import { UsuariosPage } from '../features/usuarios/pages/UsuariosPage'
 
 export function AppRoutes() {
   return (
@@ -25,8 +28,11 @@ export function AppRoutes() {
         {/* Rotas privadas — todas dentro do Layout */}
         <Route element={<PrivateRoute />}>
           <Route element={<Layout />}>
+            <Route path="/notificacoes" element={<NotificacoesPage />} />
+            <Route path="/estoque" element={<EstoquePage />} />
             <Route path="/produtos"     element={<ProdutosPage />} />
             <Route path="/dashboard"    element={<DashboardPage />} />
+            <Route path="/usuarios" element={<UsuariosPage />} />
             {/* demais rotas entram aqui conforme avançamos */}
           </Route>
         </Route>

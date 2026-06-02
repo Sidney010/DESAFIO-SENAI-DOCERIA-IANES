@@ -48,7 +48,7 @@ CREATE TABLE tb_lote (
 
 CREATE TABLE tb_movimentacao (
     id_movimentacao INT NOT NULL AUTO_INCREMENT,
-    tipo_movimentacao ENUM('Entrada', 'Saída') NOT NULL,
+    tipo_movimentacao ENUM('Entrada', 'Saida') NOT NULL,
     motivo VARCHAR(100) NOT NULL, 
     quantidade FLOAT NOT NULL,    
     data_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -75,3 +75,98 @@ CREATE TABLE IF NOT EXISTS tb_recuperacao_senha (
         REFERENCES tb_usuario (id_usuario) ON DELETE CASCADE
 );
 
+-- ─── 1. Corrigir estrutura antes de inserir ───────────────────────────────────
+
+-- Padroniza tipo_medida
+ALTER TABLE tb_lote 
+  MODIFY tipo_medida ENUM('peso', 'porcao') NOT NULL;
+
+-- Padroniza data_fabricacao para DATE
+ALTER TABLE tb_lote 
+  MODIFY data_fabricacao DATE NOT NULL;
+
+-- Remove acento do ENUM de movimentacao
+ALTER TABLE tb_movimentacao 
+  MODIFY tipo_movimentacao ENUM('Entrada', 'Saida') NOT NULL;
+
+
+-- ─── 2. Novos produtos usando categorias existentes ───────────────────────────
+-- Categorias disponíveis:
+-- id 2 → Bolos deliciosos
+-- id 3 → Torta
+-- id 4 → Sobremesas
+-- id 5 → Doces Gourmet
+
+INSERT INTO tb_produto
+  (nome_produto, codigo_identificador, sabor_massa, recheio, cobertura, detalhes, limite_minimo_alerta, id_categoria)
+VALUES
+  ('Bolo de Morango',               1004, 'Baunilha',   'Morango',       'Chantilly',          'Decorado com morangos',   5,  2),
+  ('Cupcake Red Velvet',            1009, 'Red Velvet',  'Cream Cheese',  'Cream Cheese',       'Cupcake especial',        10, 2),
+  ('Bolo de Cenoura',               1011, 'Cenoura',     'Chocolate',     'Chocolate',          'Cobertura cremosa',       5,  2),
+  ('Torta Holandesa',               1005, NULL,          'Creme Holandes','Chocolate',          'Torta especial',          3,  3),
+  ('Cheesecake de Frutas Vermelhas',1010, NULL,          'Cream Cheese',  'Frutas Vermelhas',   'Cheesecake artesanal',    4,  4),
+  ('Pudim Tradicional',             1006, NULL,          NULL,            'Calda de Caramelo',  'Receita caseira',         5,  4),
+  ('Brigadeiro Gourmet',            1007, NULL,          NULL,            'Granulado Belga',    'Unidade gourmet',         20, 5),
+  ('Beijinho Gourmet',              1008, NULL,          NULL,            'Coco Ralado',        'Unidade gourmet',         20, 5),
+  ('Brownie Tradicional',           1012, 'Chocolate',   NULL,            NULL,                 'Brownie artesanal',       10, 5);
+
+
+-- ─── 3. Lotes para todos os produtos ─────────────────────────────────────────
+-- Produtos existentes: id 1 e 2
+-- Produtos recém inseridos: ids 3 a 11 (verifique com SELECT * FROM tb_produto)
+
+INSERT INTO tb_lote
+  (data_fabricacao, data_vencimento, tipo_medida, quantidade_peso, quantidade_porcoes, status_validade, id_produto)
+VALUES
+  ('2026-06-01', '2026-06-10', 'peso',   5.0,  NULL, 'No prazo', 1),
+  ('2026-06-01', '2026-06-08', 'porcao', NULL,  30,  'No prazo', 2),
+  ('2026-06-01', '2026-06-09', 'porcao', NULL,  20,  'No prazo', 33),
+  ('2026-06-01', '2026-06-15', 'porcao', NULL,  24,  'No prazo', 34),
+  ('2026-06-01', '2026-06-12', 'peso',   2.5,  NULL, 'No prazo', 35),
+  ('2026-06-01', '2026-06-11', 'peso',   4.5,  NULL, 'No prazo', 36),
+  ('2026-06-01', '2026-06-14', 'porcao', NULL,  10,  'No prazo', 37),
+  ('2026-06-01', '2026-06-09', 'peso',   3.0,  NULL, 'No prazo', 38),
+  ('2026-06-01', '2026-06-20', 'porcao', NULL, 100,  'No prazo', 39),
+  ('2026-06-01', '2026-06-20', 'porcao', NULL, 100,  'No prazo', 40),
+  ('2026-06-01', '2026-06-18', 'porcao', NULL,  40,  'No prazo', 41);
+
+-- ─── 4. Movimentações usando usuários existentes ──────────────────────────────
+-- id_usuario 1 = Sidney, id_usuario 2 = Usuário teste
+
+INSERT INTO tb_movimentacao
+  (tipo_movimentacao, motivo, quantidade, data_hora, id_lote, id_usuario)
+VALUES
+  ('Entrada', 'Producao diaria',  20,  '2026-06-01 10:00:00', 33, 1),
+  ('Saida',   'Venda balcao',      4,  '2026-06-01 11:00:00', 33, 2),
+
+  ('Entrada', 'Producao diaria',  24,  '2026-06-01 11:00:00', 34, 1),
+  ('Saida',   'Pedido cliente',    6,  '2026-06-01 12:00:00', 34, 2),
+
+  ('Entrada', 'Producao diaria',  2.5, '2026-06-01 12:00:00', 35, 1),
+  ('Saida',   'Venda balcao',     0.5, '2026-06-01 13:00:00', 35, 2),
+
+  ('Entrada', 'Producao diaria',  4.5, '2026-06-01 13:00:00', 36, 1),
+  ('Saida',   'Venda balcao',     1.5, '2026-06-01 14:00:00', 36, 2),
+
+  ('Entrada', 'Producao diaria',  10,  '2026-06-01 14:00:00', 37, 1),
+  ('Saida',   'Pedido festa',      2,  '2026-06-01 15:00:00', 37, 2),
+
+  ('Entrada', 'Producao diaria',  3.0, '2026-06-01 15:00:00', 38, 1),
+  ('Saida',   'Venda balcao',     1.0, '2026-06-01 16:00:00', 38, 2),
+
+  ('Entrada', 'Producao diaria', 100,  '2026-06-01 16:00:00', 39,  1),
+  ('Saida',   'Venda balcao',     10,  '2026-06-01 17:00:00', 39,  2),
+
+  ('Entrada', 'Producao diaria', 100,  '2026-06-01 17:00:00', 40, 1),
+  ('Saida',   'Venda balcao',     15,  '2026-06-01 18:00:00', 40, 2),
+
+  ('Entrada', 'Producao diaria',  40,  '2026-06-01 18:00:00', 41, 1),
+  ('Saida',   'Venda balcao',      8,  '2026-06-01 19:00:00', 41, 2);
+
+
+-- ─── 5. Verificação final ─────────────────────────────────────────────────────
+SELECT * FROM tb_categoria;
+SELECT * FROM tb_produto;
+SELECT * FROM tb_lote;
+SELECT * FROM tb_movimentacao;
+SELECT id_produto, nome_produto FROM tb_produto ORDER BY id_produto;
